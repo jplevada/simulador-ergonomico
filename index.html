@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simulador Ergonômico · ICQA</title>
+<title>Simulador Ergonômico v2 · ICQA</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
@@ -32,7 +32,7 @@
     cursor: pointer; display: flex; justify-content: space-between; align-items: center;
     margin-bottom: 4px; user-select: none;
   }
-  .sol-hdr:hover { filter: brightness(1.1); }
+  .sol-hdr:hover { filter: brightness(1.12); }
   .sol-body { background: white; border-radius: 0 0 8px 8px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
   .badge { display: inline-block; border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
   .badge-g { background: #d4edda; color: #155724; }
@@ -43,79 +43,100 @@
   .btn-del:hover { color: #c0392b; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #90bcd4; border-top-color: #f36c21; border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .zone-legend { display: flex; gap: 12px; font-size: 11px; margin-top: 6px; }
+  .zone-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .v2-badge { background: linear-gradient(90deg,#f36c21,#e74c3c); color:white; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; letter-spacing:.05em; }
+  @media print {
+    .no-print { display: none !important; }
+    .print-only { display: block !important; }
+    body { overflow: visible !important; height: auto !important; }
+    main { overflow: visible !important; }
+  }
 </style>
 </head>
 <body class="bg-gray-100" style="height:100vh;overflow:hidden;display:flex;flex-direction:column">
 
 <!-- TOP BAR -->
-<div style="background:#0d2137;flex-shrink:0" class="text-white px-6 py-3 flex items-center gap-3 shadow-xl">
+<div style="background:#0d2137;flex-shrink:0" class="text-white px-6 py-3 flex items-center gap-3 shadow-xl no-print">
   <span style="font-size:1.6rem">🏭</span>
-  <div>
-    <div class="font-bold text-base">Simulador de Layout Ergonômico</div>
-    <div style="color:#90bcd4;font-size:11px">ICQA · Otimização Multi-Objetivo · Edite os dados e clique em Otimizar Layout</div>
+  <div class="flex-1">
+    <div class="font-bold text-base flex items-center gap-2">
+      Simulador de Layout Ergonômico
+      <span class="v2-badge">v2</span>
+    </div>
+    <div style="color:#90bcd4;font-size:11px">ICQA · Otimização com Busca Local · Auto-save ativado</div>
   </div>
+  <button onclick="resetDefaults()" title="Resetar para dados padrão"
+    style="background:#1a4b78;color:#90bcd4;border:none;border-radius:4px;padding:5px 10px;font-size:11px;cursor:pointer">
+    ↺ Reset
+  </button>
 </div>
 
-<!-- BODY: sidebar + main -->
+<!-- BODY -->
 <div style="flex:1;display:flex;overflow:hidden">
 
   <!-- SIDEBAR -->
-  <aside class="sidebar flex-shrink-0 overflow-y-auto" style="width:252px;background:#0d2137;color:#d0e4f5;padding:18px 16px">
+  <aside class="sidebar flex-shrink-0 overflow-y-auto no-print" style="width:252px;background:#0d2137;color:#d0e4f5;padding:18px 16px">
     <div style="font-size:13px;font-weight:700;color:white;margin-bottom:10px">⚙️ Configuração</div>
     <hr style="border-color:#1a4b78;margin-bottom:14px">
 
     <div style="font-size:10px;font-weight:700;color:#90bcd4;letter-spacing:.06em;margin-bottom:6px">ALGORITMO</div>
-    <label style="font-size:11px">Iterações: <b id="iterLbl" style="color:white">2000</b></label>
-    <input type="range" id="nIter" min="500" max="20000" step="500" value="2000"
-      oninput="document.getElementById('iterLbl').textContent=this.value" style="margin:5px 0 14px">
+    <label style="font-size:11px">Iterações: <b id="iterLbl" style="color:white">500</b></label>
+    <input type="range" id="nIter" min="100" max="5000" step="100" value="500"
+      oninput="document.getElementById('iterLbl').textContent=this.value" style="margin:5px 0 6px">
+    <div style="font-size:10px;color:#90bcd4;margin-bottom:14px">v2 usa busca local — menos iterações, resultados melhores</div>
 
     <div style="font-size:10px;font-weight:700;color:#90bcd4;letter-spacing:.06em;margin-bottom:6px">PENALIDADES ERGONÔMICAS</div>
-
     <label style="font-size:11px">Penalidade Não Alocado (TMU)</label>
     <input type="number" id="penUnalloc" value="150" min="0" max="500" step="10" style="margin:3px 0 10px">
-
     <label style="font-size:11px">Altura início penalidade (m)</label>
     <input type="number" id="liftStart" value="0.15" min="0" max="1.5" step="0.05" style="margin:3px 0 10px">
-
     <label style="font-size:11px">Penalidade por metro acima (TMU)</label>
     <input type="number" id="liftPerM" value="50" min="0" max="200" step="5" style="margin:3px 0 20px">
 
     <hr style="border-color:#1a4b78;margin-bottom:14px">
 
     <button onclick="startOptimization()" id="btnOpt"
-      style="width:100%;background:#f36c21;color:white;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.02em">
+      style="width:100%;background:#f36c21;color:white;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer">
       🚀 OTIMIZAR LAYOUT
     </button>
     <div id="sideStatus" style="margin-top:9px;font-size:11px;color:#90bcd4;text-align:center;min-height:18px"></div>
+
+    <!-- Zone legend -->
+    <hr style="border-color:#1a4b78;margin:16px 0 10px">
+    <div style="font-size:10px;font-weight:700;color:#90bcd4;letter-spacing:.06em;margin-bottom:8px">ZONAS ERGONÔMICAS</div>
+    <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
+      <div><span style="display:inline-block;width:10px;height:10px;background:rgba(39,174,96,0.5);border-radius:2px;margin-right:5px"></span>Verde — 0.15–0.45 m · Conforto</div>
+      <div><span style="display:inline-block;width:10px;height:10px;background:rgba(243,156,18,0.5);border-radius:2px;margin-right:5px"></span>Amarela — 0.45–0.60 m · Moderado</div>
+      <div><span style="display:inline-block;width:10px;height:10px;background:rgba(231,76,60,0.5);border-radius:2px;margin-right:5px"></span>Vermelha — >0.60 m · Alto esforço</div>
+    </div>
   </aside>
 
   <!-- MAIN -->
   <main style="flex:1;overflow-y:auto;padding:20px 24px">
 
     <!-- FOTO DA BANCADA -->
-    <div class="card mb-5" id="photoCard">
+    <div class="card mb-5 no-print" id="photoCard">
       <div class="flex items-center justify-between mb-3">
         <h2 style="font-weight:700;color:#0d2137;font-size:14px">📸 Referência da Bancada</h2>
         <div style="display:flex;gap:8px;align-items:center">
-          <label id="uploadLabel" style="background:#00a9e0;color:white;border-radius:4px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">
+          <label style="background:#00a9e0;color:white;border-radius:4px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">
             📎 Carregar foto
             <input type="file" accept="image/*" style="display:none" onchange="loadPhoto(this)">
           </label>
           <button id="btnRemovePhoto" onclick="removePhoto()" style="display:none;background:#fdecea;color:#e74c3c;border:1px solid #f5c6cb;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer">✕ Remover</button>
         </div>
       </div>
-      <div id="photoPlaceholder" style="border:2px dashed #d1d5db;border-radius:6px;padding:28px;text-align:center;color:#aaa;font-size:13px">
+      <div id="photoPlaceholder" style="border:2px dashed #d1d5db;border-radius:6px;padding:20px;text-align:center;color:#aaa;font-size:13px">
         Clique em <b>Carregar foto</b> para exibir a imagem de referência das posições na bancada.
       </div>
       <div id="photoWrap" style="display:none;text-align:center">
-        <img id="photoImg" style="max-height:380px;max-width:100%;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.15);object-fit:contain">
+        <img id="photoImg" style="max-height:340px;max-width:100%;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.15);object-fit:contain">
       </div>
     </div>
 
     <!-- DATA EDITORS -->
-    <div class="grid grid-cols-2 gap-5 mb-5">
-
-      <!-- Flyers -->
+    <div class="grid grid-cols-2 gap-5 mb-5 no-print">
       <div class="card">
         <div class="flex justify-between items-center mb-3">
           <h2 style="font-weight:700;color:#0d2137;font-size:14px">📦 Flyers</h2>
@@ -126,8 +147,6 @@
           <tbody id="tbFlyers"></tbody>
         </table>
       </div>
-
-      <!-- Positions -->
       <div class="card">
         <div class="flex justify-between items-center mb-3">
           <h2 style="font-weight:700;color:#0d2137;font-size:14px">📍 Posições na Bancada</h2>
@@ -140,24 +159,16 @@
       </div>
     </div>
 
-    <!-- RESULTS (hidden until optimized) -->
+    <!-- RESULTS -->
     <div id="results" style="display:none">
-
-      <!-- Metrics -->
       <div class="grid grid-cols-4 gap-4 mb-5" id="metrics"></div>
-
-      <!-- Pareto -->
-      <div class="card mb-5">
+      <div class="card mb-5 no-print">
         <h2 style="font-weight:700;color:#0d2137;font-size:14px;margin-bottom:10px">📊 Fronteira de Pareto</h2>
         <div id="chartPareto"></div>
       </div>
-
-      <!-- Top 5 -->
       <h2 style="font-weight:700;color:#0d2137;font-size:16px;margin-bottom:10px">🏆 Top 5 Soluções</h2>
       <div id="solutions"></div>
-
-      <!-- Download -->
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb">
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb" class="no-print">
         <button onclick="downloadCSV()"
           style="background:#0d2137;color:white;border:none;border-radius:6px;padding:9px 18px;cursor:pointer;font-size:12px">
           ⬇️ Baixar soluções Pareto (CSV)
@@ -168,7 +179,7 @@
 </div>
 
 <script>
-// ── DEFAULT DATA ───────────────────────────────────────────────────────────────
+// ── DEFAULTS ───────────────────────────────────────────────────────────────────
 const DEF_FLYERS = [
   {name:"B3",    freq:0.284, w:0.41},
   {name:"B2",    freq:0.178, w:0.20},
@@ -179,7 +190,6 @@ const DEF_FLYERS = [
   {name:"B6",    freq:0.003, w:0.70},
   {name:"B5",    freq:0.001, w:0.41},
 ];
-
 const DEF_POS = [
   {name:"POSIÇÃO 01", x:0.38, h:0.00, w:0.934},
   {name:"POSIÇÃO 02", x:0.36, h:0.01, w:0.924},
@@ -193,26 +203,49 @@ const DEF_POS = [
 
 let paretoResults = [], _top5 = [], _flyers = [], _positions = [];
 
-// ── TABLE HELPERS ──────────────────────────────────────────────────────────────
+// ── LOCAL STORAGE ──────────────────────────────────────────────────────────────
+const LS_KEY = 'icqa_sim_v2';
+
+function saveToStorage() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      flyers: readFlyers(), positions: readPositions()
+    }));
+  } catch(e) {}
+}
+
+function loadFromStorage() {
+  try {
+    const d = JSON.parse(localStorage.getItem(LS_KEY));
+    if (d && d.flyers && d.positions) return d;
+  } catch(e) {}
+  return null;
+}
+
+function resetDefaults() {
+  localStorage.removeItem(LS_KEY);
+  renderFlyers(DEF_FLYERS);
+  renderPositions(DEF_POS);
+}
+
+// ── TABLES ─────────────────────────────────────────────────────────────────────
 function renderFlyers(data) {
-  const tb = document.getElementById('tbFlyers');
-  tb.innerHTML = data.map((f, i) => `
+  document.getElementById('tbFlyers').innerHTML = data.map((f,i) => `
     <tr>
-      <td><input type="text"   id="fn${i}" value="${f.name}"></td>
-      <td><input type="number" id="ff${i}" value="${f.freq}" step="0.001" min="0" max="1"></td>
-      <td><input type="number" id="fw${i}" value="${f.w}"    step="0.01"  min="0.01"></td>
+      <td><input type="text"   id="fn${i}" value="${f.name}" onchange="saveToStorage()"></td>
+      <td><input type="number" id="ff${i}" value="${f.freq}" step="0.001" min="0" max="1" onchange="saveToStorage()"></td>
+      <td><input type="number" id="fw${i}" value="${f.w}"    step="0.01"  min="0.01" onchange="saveToStorage()"></td>
       <td><button class="btn-del" onclick="removeFlyer(${i})">✕</button></td>
     </tr>`).join('');
 }
 
 function renderPositions(data) {
-  const tb = document.getElementById('tbPositions');
-  tb.innerHTML = data.map((p, i) => `
+  document.getElementById('tbPositions').innerHTML = data.map((p,i) => `
     <tr>
-      <td><input type="text"   id="pn${i}" value="${p.name}"></td>
-      <td><input type="number" id="px${i}" value="${p.x}"    step="0.01" min="0"></td>
-      <td><input type="number" id="ph${i}" value="${p.h}"    step="0.01" min="0"></td>
-      <td><input type="number" id="pw${i}" value="${p.w}"    step="0.01" min="0.01"></td>
+      <td><input type="text"   id="pn${i}" value="${p.name}" onchange="saveToStorage()"></td>
+      <td><input type="number" id="px${i}" value="${p.x}"    step="0.01" min="0" onchange="saveToStorage()"></td>
+      <td><input type="number" id="ph${i}" value="${p.h}"    step="0.01" min="0" onchange="saveToStorage()"></td>
+      <td><input type="number" id="pw${i}" value="${p.w}"    step="0.01" min="0.01" onchange="saveToStorage()"></td>
       <td><button class="btn-del" onclick="removePosition(${i})">✕</button></td>
     </tr>`).join('');
 }
@@ -220,32 +253,48 @@ function renderPositions(data) {
 function readFlyers() {
   return [...document.querySelectorAll('#tbFlyers tr')].map((_,i) => ({
     name: document.getElementById(`fn${i}`).value,
-    freq: parseFloat(document.getElementById(`ff${i}`).value) || 0,
-    w:    parseFloat(document.getElementById(`fw${i}`).value) || 0.1,
+    freq: parseFloat(document.getElementById(`ff${i}`).value)||0,
+    w:    parseFloat(document.getElementById(`fw${i}`).value)||0.1,
   }));
 }
-
 function readPositions() {
   return [...document.querySelectorAll('#tbPositions tr')].map((_,i) => ({
     name: document.getElementById(`pn${i}`).value,
-    x:    parseFloat(document.getElementById(`px${i}`).value) || 0,
-    h:    parseFloat(document.getElementById(`ph${i}`).value) || 0,
-    w:    parseFloat(document.getElementById(`pw${i}`).value) || 0.1,
+    x:    parseFloat(document.getElementById(`px${i}`).value)||0,
+    h:    parseFloat(document.getElementById(`ph${i}`).value)||0,
+    w:    parseFloat(document.getElementById(`pw${i}`).value)||0.1,
   }));
 }
 
-function addFlyer()    { const d=readFlyers();    d.push({name:`F${d.length+1}`,freq:0.01,w:0.30}); renderFlyers(d); }
-function removeFlyer(i){ const d=readFlyers();    d.splice(i,1); renderFlyers(d); }
-function addPosition() { const d=readPositions(); d.push({name:`POSIÇÃO ${String(d.length+1).padStart(2,'0')}`,x:0.40,h:0.30,w:0.90}); renderPositions(d); }
-function removePosition(i){ const d=readPositions(); d.splice(i,1); renderPositions(d); }
+function addFlyer()        { const d=readFlyers();    d.push({name:`F${d.length+1}`,freq:0.01,w:0.30}); renderFlyers(d); saveToStorage(); }
+function removeFlyer(i)    { const d=readFlyers();    d.splice(i,1); renderFlyers(d); saveToStorage(); }
+function addPosition()     { const d=readPositions(); d.push({name:`POSIÇÃO ${String(d.length+1).padStart(2,'0')}`,x:0.40,h:0.30,w:0.90}); renderPositions(d); saveToStorage(); }
+function removePosition(i) { const d=readPositions(); d.splice(i,1); renderPositions(d); saveToStorage(); }
+
+// ── PHOTO ──────────────────────────────────────────────────────────────────────
+function loadPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('photoImg').src = e.target.result;
+    document.getElementById('photoPlaceholder').style.display = 'none';
+    document.getElementById('photoWrap').style.display = 'block';
+    document.getElementById('btnRemovePhoto').style.display = 'inline-block';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+function removePhoto() {
+  document.getElementById('photoImg').src = '';
+  document.getElementById('photoPlaceholder').style.display = 'block';
+  document.getElementById('photoWrap').style.display = 'none';
+  document.getElementById('btnRemovePhoto').style.display = 'none';
+  document.querySelector('#photoCard input[type=file]').value = '';
+}
 
 // ── OPTIMIZATION ──────────────────────────────────────────────────────────────
 function shuffle(arr) {
   const a = [...arr];
-  for (let i = a.length-1; i > 0; i--) {
-    const j = Math.floor(Math.random()*(i+1));
-    [a[i],a[j]] = [a[j],a[i]];
-  }
+  for (let i=a.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
   return a;
 }
 
@@ -262,8 +311,42 @@ function evaluate(fp, pp, flyers, positions, nPlace, cfg) {
   return {tmu, waste, viol};
 }
 
-function isPareto(solutions) {
-  return solutions.filter(a => !solutions.some(b => b!==a && b.tmu<=a.tmu && b.waste<=a.waste && (b.tmu<a.tmu||b.waste<a.waste)));
+// Local search: swap pairs of flyer assignments to improve TMU
+function localSearch(fp, pp, flyers, positions, nPlace, cfg) {
+  fp = [...fp];
+  let best = evaluate(fp, pp, flyers, positions, nPlace, cfg);
+  let improved = true;
+  while (improved) {
+    improved = false;
+    for (let i=0; i<nPlace-1; i++) {
+      for (let j=i+1; j<nPlace; j++) {
+        [fp[i],fp[j]] = [fp[j],fp[i]];
+        const res = evaluate(fp, pp, flyers, positions, nPlace, cfg);
+        if (res.viol <= 0 && res.tmu < best.tmu) {
+          best = res; improved = true;
+        } else {
+          [fp[i],fp[j]] = [fp[j],fp[i]];
+        }
+      }
+    }
+  }
+  return {fp, best};
+}
+
+function isPareto(sols) {
+  return sols.filter(a => !sols.some(b => b!==a && b.tmu<=a.tmu && b.waste<=a.waste && (b.tmu<a.tmu||b.waste<a.waste)));
+}
+
+function tmuPerPosition(alloc, flyers, positions, cfg) {
+  const result = {};
+  positions.forEach(pos => {
+    const fname = Object.keys(alloc).find(f => alloc[f] === pos.name);
+    if (!fname) { result[pos.name] = 0; return; }
+    const f = flyers.find(fl => fl.name === fname);
+    const dist = Math.sqrt(pos.x*pos.x + pos.h*pos.h);
+    result[pos.name] = f.freq * (dist*100*0.3 + 2.0 + Math.max(0, pos.h-cfg.liftStart)*cfg.liftPerM);
+  });
+  return result;
 }
 
 function startOptimization() {
@@ -292,15 +375,19 @@ function startOptimization() {
       const posIdx = [...Array(nPos).keys()];
 
       for (let iter=0; iter<nIter; iter++) {
-        const fp = shuffle(flyIdx);
+        let fp = shuffle(flyIdx);
         const pp = shuffle(posIdx);
-        const res = evaluate(fp, pp, flyers, positions, nPlace, cfg);
-        if (res.viol <= 0) {
-          const alloc = {}, unalloc = [];
-          for (let i=0; i<nPlace; i++) alloc[flyers[fp[i]].name] = positions[pp[i]].name;
-          for (let i=nPlace; i<nFly; i++) unalloc.push(flyers[fp[i]].name);
-          feasible.push({tmu:res.tmu, waste:res.waste, alloc, unalloc});
-        }
+        const init = evaluate(fp, pp, flyers, positions, nPlace, cfg);
+        if (init.viol > 0) continue;
+
+        // Apply local search to improve this solution
+        const {fp: fpOpt, best} = localSearch(fp, pp, flyers, positions, nPlace, cfg);
+        if (best.viol > 0) continue;
+
+        const alloc = {}, unalloc = [];
+        for (let i=0; i<nPlace; i++) alloc[flyers[fpOpt[i]].name] = positions[pp[i]].name;
+        for (let i=nPlace; i<nFly; i++) unalloc.push(flyers[fpOpt[i]].name);
+        feasible.push({tmu:best.tmu, waste:best.waste, alloc, unalloc, cfg});
       }
 
       if (feasible.length === 0) {
@@ -312,11 +399,13 @@ function startOptimization() {
       _top5      = paretoResults.slice(0,5);
       _flyers    = flyers;
       _positions = positions;
+      _cfg       = cfg;
 
       renderResults();
       status.innerHTML = `✅ ${paretoResults.length} soluções Pareto`;
     } catch(e) {
       status.innerHTML = `❌ Erro: ${e.message}`;
+      console.error(e);
     } finally {
       btn.disabled = false;
       btn.innerHTML = '🚀 OTIMIZAR LAYOUT';
@@ -325,82 +414,75 @@ function startOptimization() {
 }
 
 // ── RESULTS ───────────────────────────────────────────────────────────────────
+let _cfg = {};
+
 function renderResults() {
   document.getElementById('results').style.display = 'block';
 
-  const minTMU  = _top5[0].tmu;
+  const minTMU   = _top5[0].tmu;
   const minWaste = Math.min(...paretoResults.map(s=>s.waste));
   const nUnalloc = _top5[0].unalloc.length;
 
-  // Metrics
   document.getElementById('metrics').innerHTML = [
-    {label:'SOLUÇÕES VIÁVEIS',       val:paretoResults.length,       cls:'',  fmt:v=>v},
-    {label:'MELHOR TMU ERGONÔMICO',  val:minTMU,                     cls:'o', fmt:v=>v.toFixed(2)},
-    {label:'MENOR DESPERDÍCIO (m)',  val:minWaste,                   cls:'g', fmt:v=>v.toFixed(2)},
-    {label:'NÃO ALOCADOS (SOL. 1)', val:nUnalloc,                   cls: nUnalloc?'r':'g', fmt:v=>v},
+    {label:'SOLUÇÕES VIÁVEIS',      val:paretoResults.length, cls:'',  fmt:v=>v},
+    {label:'MELHOR TMU ERGONÔMICO', val:minTMU,               cls:'o', fmt:v=>v.toFixed(2)},
+    {label:'MENOR DESPERDÍCIO (m)', val:minWaste,             cls:'g', fmt:v=>v.toFixed(2)},
+    {label:'NÃO ALOCADOS (SOL. 1)',val:nUnalloc,             cls:nUnalloc?'r':'g', fmt:v=>v},
   ].map(m=>`
     <div class="card metric ${m.cls}">
       <div style="font-size:10px;color:#888;font-weight:600;letter-spacing:.05em;margin-bottom:4px">${m.label}</div>
       <div style="font-size:26px;font-weight:700;color:#0d2137">${m.fmt(m.val)}</div>
     </div>`).join('');
 
-  // Pareto chart
   Plotly.newPlot('chartPareto', [
-    {
-      x: paretoResults.map(s=>s.tmu), y: paretoResults.map(s=>s.waste),
-      mode: 'markers+lines',
-      marker: {color:'#00a9e0', size:6, opacity:0.5},
-      line: {color:'#00a9e0', width:1},
-      name: 'Soluções Pareto',
-      hovertemplate: 'TMU: %{x:.2f}<br>Desperdício: %{y:.2f} m<extra></extra>',
-    },
-    {
-      x: _top5.map(s=>s.tmu), y: _top5.map(s=>s.waste),
-      mode: 'markers+text',
-      marker: {color:'#f36c21', size:14, symbol:'star', line:{color:'black',width:1}},
-      text: _top5.map((_,i)=>`Sol ${i+1}`),
-      textposition: 'top center',
-      name: 'Top 5',
-    }
+    { x:paretoResults.map(s=>s.tmu), y:paretoResults.map(s=>s.waste),
+      mode:'markers+lines', marker:{color:'#00a9e0',size:6,opacity:0.5},
+      line:{color:'#00a9e0',width:1}, name:'Soluções Pareto',
+      hovertemplate:'TMU: %{x:.2f}<br>Desperdício: %{y:.2f} m<extra></extra>' },
+    { x:_top5.map(s=>s.tmu), y:_top5.map(s=>s.waste),
+      mode:'markers+text', marker:{color:'#f36c21',size:14,symbol:'star',line:{color:'black',width:1}},
+      text:_top5.map((_,i)=>`Sol ${i+1}`), textposition:'top center', name:'Top 5' }
   ], {
-    xaxis: {title:'Custo Ergonômico Total (TMU)'},
-    yaxis: {title:'Desperdício de Espaço (m)'},
-    height: 320,
-    template: 'plotly_white',
-    margin: {t:10, b:45, l:60, r:20},
-    legend: {orientation:'h', yanchor:'bottom', y:1.02, xanchor:'right', x:1},
+    xaxis:{title:'Custo Ergonômico Total (TMU)'},
+    yaxis:{title:'Desperdício de Espaço (m)'},
+    height:300, template:'plotly_white',
+    margin:{t:10,b:45,l:60,r:20},
+    legend:{orientation:'h',yanchor:'bottom',y:1.02,xanchor:'right',x:1},
   }, {responsive:true});
 
-  // Solutions
   const solDiv = document.getElementById('solutions');
   solDiv.innerHTML = '';
-
   _top5.forEach((sol, rank) => {
-    const badge = sol.unalloc.length === 0
+    const badge = sol.unalloc.length===0
       ? '<span class="badge badge-g">🟢 Todos alocados</span>'
       : `<span class="badge badge-y">🟡 Não alocados: ${sol.unalloc.join(', ')}</span>`;
 
     const wrap = document.createElement('div');
     wrap.style.marginBottom = '12px';
     wrap.innerHTML = `
-      <div class="sol-hdr" onclick="toggleSol(${rank})">
+      <div class="sol-hdr no-print" onclick="toggleSol(${rank})">
         <span style="font-size:13px">
           <b>Solução ${rank+1}</b> &nbsp;·&nbsp; TMU: ${sol.tmu.toFixed(2)}
           &nbsp;·&nbsp; Desperdício: ${sol.waste.toFixed(2)} m &nbsp;·&nbsp; ${badge}
         </span>
-        <span id="arr${rank}" style="font-size:12px">▼</span>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button onclick="event.stopPropagation();printSolution(${rank})"
+            style="background:#1a4b78;color:white;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer">
+            🖨️ Imprimir
+          </button>
+          <span id="arr${rank}">▼</span>
+        </div>
       </div>
       <div id="sb${rank}" class="sol-body" style="${rank===0?'':'display:none'}">
         <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:0">
-          <div style="padding:16px;border-right:1px solid #f0f0f0;overflow-x:auto">
+          <div style="padding:16px;border-right:1px solid #f0f0f0;overflow-x:auto" id="tbl${rank}">
             ${allocTable(sol)}
           </div>
-          <div id="map${rank}" style="min-height:360px"></div>
+          <div id="map${rank}" style="min-height:400px"></div>
         </div>
       </div>`;
     solDiv.appendChild(wrap);
-
-    if (rank === 0) setTimeout(() => drawMap(rank, sol), 80);
+    if (rank===0) setTimeout(()=>drawMap(rank, sol), 80);
   });
 }
 
@@ -410,14 +492,22 @@ function toggleSol(rank) {
   const open  = body.style.display !== 'none';
   body.style.display = open ? 'none' : 'block';
   arrow.textContent  = open ? '▼' : '▲';
-  if (!open) setTimeout(() => drawMap(rank, _top5[rank]), 80);
+  if (!open) setTimeout(()=>drawMap(rank, _top5[rank]), 80);
 }
 
+// ── ALLOC TABLE (with TMU column) ─────────────────────────────────────────────
 function allocTable(sol) {
+  const tmuMap = tmuPerPosition(sol.alloc, _flyers, _positions, sol.cfg||_cfg);
+  const maxTMU = Math.max(...Object.values(tmuMap).filter(v=>v>0), 0.001);
+
   const rows = _positions.map(pos => {
-    const fname = Object.keys(sol.alloc).find(f => sol.alloc[f] === pos.name);
+    const fname = Object.keys(sol.alloc).find(f => sol.alloc[f]===pos.name);
+    const posT  = (tmuMap[pos.name]||0).toFixed(3);
+    const barW  = Math.round(60*(tmuMap[pos.name]||0)/maxTMU);
+    const bar   = `<div style="background:#f36c21;height:6px;width:${barW}px;border-radius:3px;margin-top:2px"></div>`;
+
     if (fname) {
-      const f = _flyers.find(fl => fl.name === fname);
+      const f = _flyers.find(fl=>fl.name===fname);
       const folga = pos.w - f.w;
       return `<tr>
         <td>${pos.name}</td>
@@ -426,6 +516,7 @@ function allocTable(sol) {
         <td>${(pos.w*100).toFixed(0)}</td>
         <td>${(f.w*100).toFixed(0)}</td>
         <td>${(folga*100).toFixed(0)}</td>
+        <td><div>${posT}</div>${bar}</td>
         <td>${folga>=0?'<span style="color:#27ae60">✅ OK</span>':'<span style="color:#e74c3c">❌</span>'}</td>
       </tr>`;
     }
@@ -434,136 +525,187 @@ function allocTable(sol) {
       <td style="color:#bbb">—</td><td style="color:#bbb">—</td>
       <td>${(pos.w*100).toFixed(0)}</td>
       <td style="color:#bbb">—</td><td style="color:#bbb">—</td>
-      <td style="color:#bbb">⬜ Vaga</td>
+      <td style="color:#bbb">—</td><td style="color:#bbb">⬜ Vaga</td>
     </tr>`;
   }).join('');
 
   return `
+    <div style="font-weight:700;color:#0d2137;font-size:13px;margin-bottom:8px">📋 Tabela de Alocação</div>
     <table style="border-collapse:collapse;width:100%;font-size:11px">
       <thead>
         <tr style="background:#0d2137;color:white">
-          <th style="padding:6px 8px">Posição</th>
-          <th style="padding:6px 8px">Flyer</th>
-          <th style="padding:6px 8px">Freq.</th>
-          <th style="padding:6px 8px">Pos.cm</th>
-          <th style="padding:6px 8px">Fly.cm</th>
-          <th style="padding:6px 8px">Folga</th>
-          <th style="padding:6px 8px">Status</th>
+          <th style="padding:6px 8px">Posição</th><th style="padding:6px 8px">Flyer</th>
+          <th style="padding:6px 8px">Freq.</th><th style="padding:6px 8px">Pos.cm</th>
+          <th style="padding:6px 8px">Fly.cm</th><th style="padding:6px 8px">Folga</th>
+          <th style="padding:6px 8px">TMU</th><th style="padding:6px 8px">Status</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
 }
 
+// ── BENCH MAP (front view + ergonomic zones + tooltips) ───────────────────────
 function drawMap(rank, sol) {
   const el = document.getElementById(`map${rank}`);
-  if (!el || el.dataset.done === '1') return;
+  if (!el || el.dataset.done==='1') return;
   el.dataset.done = '1';
 
-  const maxFreq = Math.max(..._flyers.map(f => f.freq));
-  const shapes = [], annots = [];
+  const maxFreq = Math.max(..._flyers.map(f=>f.freq));
+  const shapes=[], annots=[], traces=[];
 
-  // ── Group positions into height tiers (gap > 0.08 m = new tier) ────────────
-  const sorted = [..._positions].sort((a, b) => a.h - b.h || a.name.localeCompare(b.name));
+  const sorted = [..._positions].sort((a,b)=>a.h-b.h||a.name.localeCompare(b.name));
   const tiers = [[sorted[0]]];
-  for (let i = 1; i < sorted.length; i++) {
-    if (Math.abs(sorted[i].h - sorted[i-1].h) > 0.08) tiers.push([]);
-    tiers[tiers.length - 1].push(sorted[i]);
+  for (let i=1; i<sorted.length; i++) {
+    if (Math.abs(sorted[i].h-sorted[i-1].h)>0.08) tiers.push([]);
+    tiers[tiers.length-1].push(sorted[i]);
   }
 
-  const HW   = 0.55;  // half display width
-  const BH   = 0.075; // half box height
-  const maxH = Math.max(..._positions.map(p => p.h));
+  const HW=0.55, BH=0.075;
+  const maxH = Math.max(..._positions.map(p=>p.h));
+  const topY  = maxH + BH + 0.18;
 
-  // ── Bench structure ─────────────────────────────────────────────────────────
-  // Frame posts
-  for (const sx of [-HW, HW])
-    shapes.push({type:'line', x0:sx, x1:sx, y0:0.025, y1:maxH+BH+0.06,
-      line:{color:'#c8c8c8', width:3}});
-
-  // Top bar
-  shapes.push({type:'rect', x0:-HW, x1:HW, y0:maxH+BH+0.04, y1:maxH+BH+0.07,
-    fillcolor:'#c8c8c8', line:{color:'#aaa', width:1}});
-
-  // Shelf slabs — one per tier
-  tiers.forEach(tier => {
-    const tierH = tier.reduce((s, p) => s + p.h, 0) / tier.length;
-    const sy = tierH - BH - 0.028;
-    if (sy > 0.04)
-      shapes.push({type:'rect', x0:-HW, x1:HW, y0:sy, y1:sy+0.018,
-        fillcolor:'#ddd', line:{color:'#bbb', width:1}});
+  // ── Ergonomic zone bands (behind everything) ─────────────────────────────
+  const liftStart = parseFloat(document.getElementById('liftStart').value) || 0.15;
+  const zones = [
+    {y0:liftStart, y1:0.45,  color:'rgba(39,174,96,0.07)'},
+    {y0:0.45,      y1:0.60,  color:'rgba(243,156,18,0.09)'},
+    {y0:0.60,      y1:topY,  color:'rgba(231,76,60,0.07)'},
+  ];
+  zones.forEach(z => {
+    if (z.y1 <= liftStart) return;
+    shapes.push({type:'rect', x0:-HW, x1:HW, y0:Math.max(z.y0,0.025), y1:Math.min(z.y1,topY),
+      fillcolor:z.color, line:{width:0}, layer:'below'});
   });
 
-  // Work surface
-  shapes.push({type:'rect', x0:-HW-0.04, x1:HW+0.04, y0:-0.04, y1:0.024,
-    fillcolor:'#d0d0d0', line:{color:'#999', width:2}});
-  annots.push({x:0, y:0.004, text:'<b>Mesa de Trabalho</b>', showarrow:false,
-    font:{size:9, color:'#555'}, bgcolor:'rgba(0,0,0,0)'});
+  // ── Bench structure ───────────────────────────────────────────────────────
+  for (const sx of [-HW,HW])
+    shapes.push({type:'line',x0:sx,x1:sx,y0:0.025,y1:maxH+BH+0.06,line:{color:'#c8c8c8',width:3}});
+  shapes.push({type:'rect',x0:-HW,x1:HW,y0:maxH+BH+0.04,y1:maxH+BH+0.07,fillcolor:'#c8c8c8',line:{color:'#aaa',width:1}});
 
-  // Lower storage
-  shapes.push({type:'rect', x0:-HW, x1:HW, y0:-0.42, y1:-0.06,
-    fillcolor:'#f5f5f5', line:{color:'#e0e0e0', width:1, dash:'dot'}});
-  for (const sy of [-0.20, -0.34])
-    shapes.push({type:'line', x0:-HW, x1:HW, y0:sy, y1:sy,
-      line:{color:'#e8e8e8', width:1}});
-  annots.push({x:0, y:-0.24, text:'Armazenamento', showarrow:false,
-    font:{size:8, color:'#ccc'}, bgcolor:'rgba(0,0,0,0)'});
-
-  // ── Position boxes ─────────────────────────────────────────────────────────
   tiers.forEach(tier => {
-    const n     = tier.length;
-    const tierH = tier.reduce((s, p) => s + p.h, 0) / n;
-    const xs    = n === 1
-      ? [0]
-      : tier.map((_, i) => -HW + 0.10 + i * (2*HW - 0.20) / (n - 1));
-    const bw    = Math.max(0.055, Math.min(0.16, (2*HW - 0.20) / (2*n + 1)));
+    const mh = tier.reduce((s,p)=>s+p.h,0)/tier.length;
+    const sy = mh - BH - 0.028;
+    if (sy>0.04) shapes.push({type:'rect',x0:-HW,x1:HW,y0:sy,y1:sy+0.018,fillcolor:'#ddd',line:{color:'#bbb',width:1}});
+  });
 
-    tier.forEach((pos, i) => {
-      const fname = Object.keys(sol.alloc).find(f => sol.alloc[f] === pos.name);
+  shapes.push({type:'rect',x0:-HW-0.04,x1:HW+0.04,y0:-0.04,y1:0.024,fillcolor:'#d0d0d0',line:{color:'#999',width:2}});
+  annots.push({x:0,y:0.004,text:'<b>Mesa de Trabalho</b>',showarrow:false,font:{size:9,color:'#555'},bgcolor:'rgba(0,0,0,0)'});
+
+  shapes.push({type:'rect',x0:-HW,x1:HW,y0:-0.42,y1:-0.06,fillcolor:'#f5f5f5',line:{color:'#e0e0e0',width:1,dash:'dot'}});
+  for (const sy of [-0.20,-0.34])
+    shapes.push({type:'line',x0:-HW,x1:HW,y0:sy,y1:sy,line:{color:'#e8e8e8',width:1}});
+  annots.push({x:0,y:-0.24,text:'Armazenamento',showarrow:false,font:{size:8,color:'#ccc'},bgcolor:'rgba(0,0,0,0)'});
+
+  // ── Position boxes with hover data ───────────────────────────────────────
+  tiers.forEach(tier => {
+    const n    = tier.length;
+    const tierH = tier.reduce((s,p)=>s+p.h,0)/n;
+    const xs   = n===1?[0]:tier.map((_,i)=>-HW+0.10+i*(2*HW-0.20)/(n-1));
+    const bw   = Math.max(0.055, Math.min(0.16,(2*HW-0.20)/(2*n+1)));
+
+    tier.forEach((pos,i) => {
+      const fname = Object.keys(sol.alloc).find(f=>sol.alloc[f]===pos.name);
       const x = xs[i];
-      let fill, border, label, fontColor;
+      let fill, border, label, fontColor, hoverText;
 
       if (fname) {
-        const f = _flyers.find(fl => fl.name === fname);
-        const alpha = (0.55 + 0.45 * f.freq / maxFreq).toFixed(2);
+        const f = _flyers.find(fl=>fl.name===fname);
+        const alpha = (0.55+0.45*f.freq/maxFreq).toFixed(2);
         fill      = `rgba(243,108,33,${alpha})`;
         border    = '#a93226';
         label     = `<b>${fname}</b><br>${f.freq.toFixed(3)}`;
         fontColor = 'white';
+        const dist = Math.sqrt(pos.x*pos.x+pos.h*pos.h);
+        const tmu  = (f.freq*(dist*100*0.3+2.0+Math.max(0,pos.h-liftStart)*(_cfg.liftPerM||50))).toFixed(3);
+        hoverText = `<b>${fname}</b> → ${pos.name}<br>Frequência: ${f.freq.toFixed(3)}<br>Largura flyer: ${(f.w*100).toFixed(0)} cm<br>Folga: ${((pos.w-f.w)*100).toFixed(0)} cm<br>TMU desta pos: ${tmu}`;
       } else {
-        const short = pos.name.replace(/POSIÇÃO 0?/, 'P');
+        const short = pos.name.replace(/POSIÇÃO 0?/,'P');
         fill      = 'rgba(0,169,224,0.15)';
         border    = '#00a9e0';
         label     = `<b>${short}</b>`;
         fontColor = '#0d2137';
+        hoverText = `${pos.name}<br>Vaga — nenhum flyer alocado<br>Largura: ${(pos.w*100).toFixed(0)} cm`;
       }
 
-      shapes.push({type:'rect', x0:x-bw, x1:x+bw, y0:tierH-BH, y1:tierH+BH,
-        fillcolor:fill, line:{color:border, width:1.5}});
-      annots.push({x, y:tierH, text:label, showarrow:false,
-        font:{size:11, color:fontColor}, bgcolor:'rgba(0,0,0,0)', align:'center'});
+      shapes.push({type:'rect',x0:x-bw,x1:x+bw,y0:tierH-BH,y1:tierH+BH,
+        fillcolor:fill,line:{color:border,width:1.5}});
+      annots.push({x,y:tierH,text:label,showarrow:false,
+        font:{size:11,color:fontColor},bgcolor:'rgba(0,0,0,0)',align:'center'});
+
+      // Invisible scatter point for tooltip
+      traces.push({
+        x:[x], y:[tierH],
+        mode:'markers',
+        marker:{size:Math.max(bw*200, 30),opacity:0,color:'rgba(0,0,0,0)'},
+        hovertemplate:`${hoverText}<extra></extra>`,
+        showlegend:false,
+      });
     });
   });
 
-  // ── Operator marker ─────────────────────────────────────────────────────────
-  Plotly.newPlot(el, [{
+  // Operator
+  traces.push({
     x:[0], y:[-0.65],
     mode:'markers+text',
-    marker:{symbol:'triangle-up', size:22, color:'#f36c21', line:{color:'white', width:2}},
+    marker:{symbol:'triangle-up',size:22,color:'#f36c21',line:{color:'white',width:2}},
     text:['Operador  '], textposition:'middle right',
-    textfont:{size:11, color:'#f36c21'},
+    textfont:{size:11,color:'#f36c21'},
+    hovertemplate:'Posição inicial do operador<extra></extra>',
     showlegend:false,
-  }], {
-    xaxis:{range:[-0.72, 0.72], showgrid:false, zeroline:false, showticklabels:false},
-    yaxis:{title:'Altura (m)', range:[-0.88, maxH+BH+0.18],
-           showgrid:false, zeroline:false, tickformat:'.2f'},
-    height:430,
-    template:'simple_white',
-    plot_bgcolor:'#f8fafc',
+  });
+
+  Plotly.newPlot(el, traces, {
+    xaxis:{range:[-0.72,0.72],showgrid:false,zeroline:false,showticklabels:false},
+    yaxis:{title:'Altura (m)',range:[-0.88,topY],showgrid:false,zeroline:false,tickformat:'.2f'},
+    height:440, template:'simple_white', plot_bgcolor:'#f8fafc',
     shapes, annotations:annots,
-    margin:{t:10, b:10, l:52, r:10},
+    margin:{t:10,b:10,l:52,r:10},
     showlegend:false,
+    hoverlabel:{bgcolor:'white',bordercolor:'#0d2137',font:{size:12}},
   }, {responsive:true});
+}
+
+// ── PRINT SOLUTION ─────────────────────────────────────────────────────────────
+function printSolution(rank) {
+  const sol = _top5[rank];
+  const tmuMap = tmuPerPosition(sol.alloc, _flyers, _positions, sol.cfg||_cfg);
+  const maxTMU = Math.max(...Object.values(tmuMap).filter(v=>v>0),0.001);
+
+  const rows = _positions.map(pos => {
+    const fname = Object.keys(sol.alloc).find(f=>sol.alloc[f]===pos.name);
+    const posT  = (tmuMap[pos.name]||0).toFixed(3);
+    const barW  = Math.round(80*(tmuMap[pos.name]||0)/maxTMU);
+    if (fname) {
+      const f = _flyers.find(fl=>fl.name===fname);
+      const folga = pos.w-f.w;
+      return `<tr><td>${pos.name}</td><td><b>${fname}</b></td><td>${f.freq.toFixed(3)}</td><td>${(pos.w*100).toFixed(0)}</td><td>${(f.w*100).toFixed(0)}</td><td>${(folga*100).toFixed(0)}</td><td><div style="background:#f36c21;height:5px;width:${barW}px;border-radius:2px"></div>${posT}</td><td>${folga>=0?'✅ OK':'❌'}</td></tr>`;
+    }
+    return `<tr><td>${pos.name}</td><td colspan="6" style="color:#bbb">— Vaga —</td><td>⬜</td></tr>`;
+  }).join('');
+
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Solução ${rank+1} · ICQA</title>
+  <style>
+    body{font-family:Segoe UI,sans-serif;padding:24px;color:#0d2137}
+    h1{font-size:18px;margin:0 0 4px} .sub{color:#666;font-size:12px;margin-bottom:16px}
+    table{border-collapse:collapse;width:100%;font-size:12px}
+    th{background:#0d2137;color:white;padding:6px 8px;text-align:left}
+    td{padding:5px 8px;border-bottom:1px solid #eee}
+    .badge{background:#d4edda;color:#155724;border-radius:10px;padding:2px 8px;font-size:11px}
+    .kpi{display:inline-block;background:#f0f6ff;border-left:3px solid #00a9e0;padding:6px 12px;border-radius:4px;margin-right:10px;font-size:13px}
+  </style></head><body>
+  <h1>🏭 Simulador Ergonômico ICQA — Solução ${rank+1}</h1>
+  <div class="sub">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+  <div style="margin-bottom:14px">
+    <span class="kpi">TMU: <b>${sol.tmu.toFixed(2)}</b></span>
+    <span class="kpi">Desperdício: <b>${sol.waste.toFixed(2)} m</b></span>
+    <span class="badge">${sol.unalloc.length===0?'✅ Todos alocados':'⚠️ Não alocados: '+sol.unalloc.join(', ')}</span>
+  </div>
+  <table><thead><tr><th>Posição</th><th>Flyer</th><th>Freq.</th><th>Pos.cm</th><th>Fly.cm</th><th>Folga</th><th>TMU</th><th>Status</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  </body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(), 400);
 }
 
 // ── CSV DOWNLOAD ───────────────────────────────────────────────────────────────
@@ -572,35 +714,16 @@ function downloadCSV() {
   const lines = ['Rank,TMU,Desperdicio_m,Nao_Alocados',
     ...paretoResults.map((s,i)=>`${i+1},${s.tmu.toFixed(4)},${s.waste.toFixed(4)},${s.unalloc.join(';')||'Nenhum'}`)];
   const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines.join('\n'));
-  a.download = 'pareto_solutions.csv';
+  a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(lines.join('\n'));
+  a.download = 'pareto_v2.csv';
   a.click();
 }
 
-// ── FOTO DA BANCADA ───────────────────────────────────────────────────────────
-function loadPhoto(input) {
-  if (!input.files || !input.files[0]) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    document.getElementById('photoImg').src = e.target.result;
-    document.getElementById('photoPlaceholder').style.display = 'none';
-    document.getElementById('photoWrap').style.display = 'block';
-    document.getElementById('btnRemovePhoto').style.display = 'inline-block';
-  };
-  reader.readAsDataURL(input.files[0]);
-}
-
-function removePhoto() {
-  document.getElementById('photoImg').src = '';
-  document.getElementById('photoPlaceholder').style.display = 'block';
-  document.getElementById('photoWrap').style.display = 'none';
-  document.getElementById('btnRemovePhoto').style.display = 'none';
-  document.querySelector('#uploadLabel input').value = '';
-}
-
 // ── INIT ──────────────────────────────────────────────────────────────────────
-renderFlyers(DEF_FLYERS);
-renderPositions(DEF_POS);
+const saved = loadFromStorage();
+renderFlyers(saved ? saved.flyers : DEF_FLYERS);
+renderPositions(saved ? saved.positions : DEF_POS);
+if (saved) document.getElementById('sideStatus').innerHTML = '💾 Dados restaurados do último uso';
 </script>
 </body>
 </html>
