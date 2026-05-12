@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -299,16 +299,20 @@ function shuffle(arr) {
 }
 
 function evaluate(fp, pp, flyers, positions, nPlace, cfg) {
-  let tmu=0, waste=0, viol=0;
+  let tmu=0, waste=0;
   for (let i=0; i<nPlace; i++) {
     const f=flyers[fp[i]], p=positions[pp[i]];
-    const dist = Math.sqrt(p.x*p.x + p.h*p.h);
-    tmu   += f.freq * (dist*100*0.3 + 2.0 + Math.max(0, p.h-cfg.liftStart)*cfg.liftPerM);
-    waste += p.w - f.w;
-    viol  += Math.max(0, f.w - p.w);
+    if (f.w <= p.w) {
+      const dist = Math.sqrt(p.x*p.x + p.h*p.h);
+      tmu   += f.freq * (dist*100*0.3 + 2.0 + Math.max(0, p.h-cfg.liftStart)*cfg.liftPerM);
+      waste += p.w - f.w;
+    } else {
+      tmu   += f.freq * cfg.penUnalloc;
+      waste += p.w;
+    }
   }
   for (let i=nPlace; i<flyers.length; i++) tmu += flyers[fp[i]].freq * cfg.penUnalloc;
-  return {tmu, waste, viol};
+  return {tmu, waste};
 }
 
 // Local search: swap pairs of flyer assignments to improve TMU
@@ -322,7 +326,7 @@ function localSearch(fp, pp, flyers, positions, nPlace, cfg) {
       for (let j=i+1; j<nPlace; j++) {
         [fp[i],fp[j]] = [fp[j],fp[i]];
         const res = evaluate(fp, pp, flyers, positions, nPlace, cfg);
-        if (res.viol <= 0 && res.tmu < best.tmu) {
+        if (res.tmu < best.tmu) {
           best = res; improved = true;
         } else {
           [fp[i],fp[j]] = [fp[j],fp[i]];
@@ -377,15 +381,13 @@ function startOptimization() {
       for (let iter=0; iter<nIter; iter++) {
         let fp = shuffle(flyIdx);
         const pp = shuffle(posIdx);
-        const init = evaluate(fp, pp, flyers, positions, nPlace, cfg);
-        if (init.viol > 0) continue;
-
         // Apply local search to improve this solution
         const {fp: fpOpt, best} = localSearch(fp, pp, flyers, positions, nPlace, cfg);
-        if (best.viol > 0) continue;
-
         const alloc = {}, unalloc = [];
-        for (let i=0; i<nPlace; i++) alloc[flyers[fpOpt[i]].name] = positions[pp[i]].name;
+        for (let i=0; i<nPlace; i++) {
+          const f=flyers[fpOpt[i]], p=positions[pp[i]];
+          if (f.w <= p.w) { alloc[f.name] = p.name; } else { unalloc.push(f.name); }
+        }
         for (let i=nPlace; i<nFly; i++) unalloc.push(flyers[fpOpt[i]].name);
         feasible.push({tmu:best.tmu, waste:best.waste, alloc, unalloc, cfg});
       }
